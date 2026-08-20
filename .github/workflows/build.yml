@@ -14,8 +14,87 @@ jobs:
       - name: Extract source
         run: unzip ReallyClient-1.21.11-source.zip
 
+      - name: Patch 1.21.11 compatibility
+        working-directory: ReallyClient-1.21.11-source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          discord = Path('src/main/java/me/reallyclient/client/service/DiscordRpcService.java')
+          s = discord.read_text(encoding='utf-8')
+          s = s.replace('import java.time.OffsetDateTime;\n', '')
+
+          old_listener = '''            client.setListener(new IPCListener() {
+                @Override
+                public void onReady(IPCClient ipcClient) {
+                    connected = true;
+                    update(config);
+                }
+            });'''
+
+          new_listener = '''            client.setListener(new IPCListener() {
+                @Override
+                public void onPacketSent(IPCClient ipcClient, com.jagrosh.discordipc.entities.Packet packet) {
+                }
+
+                @Override
+                public void onPacketReceived(IPCClient ipcClient, com.jagrosh.discordipc.entities.Packet packet) {
+                }
+
+                @Override
+                public void onActivityJoin(IPCClient ipcClient, String secret) {
+                }
+
+                @Override
+                public void onActivitySpectate(IPCClient ipcClient, String secret) {
+                }
+
+                @Override
+                public void onActivityJoinRequest(IPCClient ipcClient, String secret, com.jagrosh.discordipc.entities.User user) {
+                }
+
+                @Override
+                public void onReady(IPCClient ipcClient) {
+                    connected = true;
+                    update(config);
+                }
+
+                @Override
+                public void onClose(IPCClient ipcClient, com.google.gson.JsonObject json) {
+                    connected = false;
+                }
+
+                @Override
+                public void onDisconnect(IPCClient ipcClient, Throwable throwable) {
+                    connected = false;
+                }
+            });'''
+
+          if old_listener not in s:
+              raise SystemExit('Discord listener block not found')
+          s = s.replace(old_listener, new_listener)
+          s = s.replace('.setStartTimestamp(OffsetDateTime.now())', '.setStartTimestamp(System.currentTimeMillis() / 1000L)')
+          discord.write_text(s, encoding='utf-8')
+
+          feature = Path('src/main/java/me/reallyclient/client/feature/FeatureController.java')
+          s = feature.read_text(encoding='utf-8')
+          if 'import net.minecraft.entity.EquipmentSlot;' not in s:
+              s = s.replace('import net.minecraft.entity.Entity;\n', 'import net.minecraft.entity.Entity;\nimport net.minecraft.entity.EquipmentSlot;\n')
+
+          old_armor = '''        int slot = 0;
+        for (ItemStack stack : client.player.getArmorItems()) {'''
+          new_armor = '''        int slot = 0;
+        for (EquipmentSlot equipmentSlot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
+            ItemStack stack = client.player.getEquippedStack(equipmentSlot);'''
+          if old_armor not in s:
+              raise SystemExit('Armor loop not found')
+          s = s.replace(old_armor, new_armor)
+          s = s.replace('PositionedSoundInstance.master(SoundEvents.BLOCK_NOTE_BLOCK_PLING, pitch)', 'PositionedSoundInstance.master(SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), pitch)')
+          feature.write_text(s, encoding='utf-8')
+          PY
+
       - name: Setup Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
