@@ -75,8 +75,8 @@ jobs:
               raise SystemExit("Armor loop not found")
           s = s.replace(old_loop, new_loop, 1)
           s = s.replace(
-              "PositionedSoundInstance.master(SoundEvents.BLOCK_NOTE_BLOCK_PLING, pitch)",
-              "PositionedSoundInstance.master(SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), pitch)",
+              "client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.BLOCK_NOTE_BLOCK_PLING, pitch));",
+              "client.player.playSound(SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), 1.0f, pitch);",
               1
           )
           feature.write_text(s, encoding="utf-8")
