@@ -1,0 +1,45 @@
+name: Build ABOBUS123
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "ABOBUS123-1.21.4-DONE.zip"
+      - ".github/workflows/build-abobus123.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check source archive
+        run: |
+          test -f ABOBUS123-1.21.4-DONE.zip || (echo "Upload ABOBUS123-1.21.4-DONE.zip to repository root first" && exit 1)
+
+      - name: Extract source
+        run: unzip -o ABOBUS123-1.21.4-DONE.zip
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build ABOBUS123
+        working-directory: ABOBUS123-1.21.4-source
+        run: |
+          chmod +x gradlew
+          ./gradlew build --stacktrace
+
+      - name: Upload mod JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: ABOBUS123-1.21.4
+          path: |
+            ABOBUS123-1.21.4-source/build/libs/*.jar
+            !ABOBUS123-1.21.4-source/build/libs/*-sources.jar
